@@ -3,10 +3,10 @@ python-dotenv
 fastapi
 google-cloud-bigquery
 openai
-thinc==8.0.3
-pydantic==1.7.3
+thinc
+pydantic
 requests
-spacy==3.1.0
+spacy
 https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.1.0/en_core_web_md-3.1.0.tar.gz
 streamlit
 toml
