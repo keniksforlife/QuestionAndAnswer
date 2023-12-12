@@ -1,0 +1,9 @@
+beautifulsoup4
+python-dotenv
+fastapi
+google-cloud-bigquery
+openai
+pydantic
+requests
+spacy
+streamlit
