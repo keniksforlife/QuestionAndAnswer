@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import streamlit as st
 from tempfile import NamedTemporaryFile
+import toml
 
 
 class QueryModel(BaseModel):
@@ -25,9 +26,16 @@ app = FastAPI()
 nlp = spacy.load('en_core_web_md')
 
 
-load_dotenv()
-open_ai_key = os.getenv("OPENAI_API_KEY")
-bigquery_credentials = os.getenv('BIGQUERY_CREDENTIALS')
+# load_dotenv()
+# open_ai_key = os.getenv("OPENAI_API_KEY")
+# bigquery_credentials = os.getenv('BIGQUERY_CREDENTIALS')
+
+# Load the TOML file
+config = toml.load('path_to_your_file.toml')
+
+# Accessing values
+open_ai_key = config["OPENAI_API_KEY"]
+bigquery_credentials = config["BIGQUERY_CREDENTIALS"]
 
 # Create a temporary file and write the credentials to it
 with NamedTemporaryFile(mode='w', delete=False) as cred_file:
