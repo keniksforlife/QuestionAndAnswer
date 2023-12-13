@@ -11,7 +11,7 @@ from datetime import datetime
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 # import streamlit as st
 from tempfile import NamedTemporaryFile
 
@@ -266,7 +266,7 @@ def summarize_content(data, query, max_sentences=5, max_sentence_length=10):
 
     return summarized_results
 
-def generate_answer_with_gpt(query, relevant_content):
+def generate_answer_with_gpt(query, relevant_content, prompt):
     try:
         openai.api_key = open_ai_key
 
@@ -274,16 +274,23 @@ def generate_answer_with_gpt(query, relevant_content):
         # print ("summary: ", summarized_content)
         if summarized_content:
         
-            # Formulate the prompt for GPT
-            prompt = f"I want you to find an answer with this question : {query} \n Find the answer in this contents: {summarized_content}\n\n"
+            # Prepare the system instructions
+            system_instructions = prompt
 
-            # Call the OpenAI API
+
+            # # Formulate the prompt for GPT
+            # user_prompt = f"I want you to find an answer with this question : {query} \n Find the answer in this contents: {summarized_content}\n\n"
+
+            # Prepare the user prompt in a conversational style
+            user_prompt = query
+            # Formulate the OpenAI API call
             response = openai.ChatCompletion.create(
-                model="gpt-4-0613",  # You can choose different engines as needed
+                model="gpt-4-0613",  # Choose the appropriate model
                 messages=[
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": prompt}
-            ]
+                    {"role": "system", "content": system_instructions},
+                    {"role": "user", "content": user_prompt},
+                    {"role": "system", "content": f"Content to refer: {summarized_content}"}
+                ]
             )
 
             print(response)
@@ -336,7 +343,7 @@ def contains_discount_phrases(content):
     return False
 
 
-def process_query_bigquery(query):
+def process_query_bigquery(query,website):
     key_terms = extract_key_terms2(query)
     print("Key terms:", key_terms)
 
@@ -345,7 +352,7 @@ def process_query_bigquery(query):
     query_sql = f"""
     SELECT url, content
     FROM `qanda-website-ai.websites.website_content`
-    WHERE {like_clauses} LIMIT 20
+    WHERE {like_clauses} AND url LIKE '%{website}%' LIMIT 20
     """
     print(query_sql)  # For debugging
     # client = bigquery.Client.from_service_account_json(json.loads(bigquery_credentials))
@@ -368,16 +375,16 @@ def process_query_bigquery(query):
 
     return relevant_content
 
-def questions(q):
+def questions(question, prompt,webste):
 
-    user_query = q  # Replace this with actual user input
-    relevant_content = process_query_bigquery(user_query)
+    user_query = question  # Replace this with actual user input
+    relevant_content = process_query_bigquery(user_query,webste)
     print("content: ", relevant_content)
     # Use NLP/AI to generate an answer from relevant_content
     # answer = generate_answer(relevant_content, user_query)  # This is a placeholder for the AI integration
 
     if relevant_content:
-        answer = generate_answer_with_gpt(user_query, relevant_content)
+        answer = generate_answer_with_gpt(user_query, relevant_content, prompt)
         print("Question: ",user_query)
         print("")
         print("Answer:", answer)
@@ -456,11 +463,11 @@ def insert_chunks_into_bigquery(website_name, url, content, batch_size=500, max_
             print(f"Encountered errors while inserting batch for {url}: {errors}")
 
 
-def begin_scraping(website_name, website_url):
-    website_name = "bluemercury"
-    website_url = "https://bluemercury.com"  # Replace with the target website URL
-    exclude_pattern = r'/(product|products|collection|collections|staging)/'  # Regular expression to exclude URLs
-    main_pages_pattern = r'/(about|faq|contact|home|pages)/'
+def begin_scraping(website_name, website_url,exclude_pattern,main_pages_pattern):
+    # website_name = "bluemercury"
+    # website_url = "https://bluemercury.com"  # Replace with the target website URL
+    # exclude_pattern = r'/(product|products|collection|collections|staging)/'  # Regular expression to exclude URLs
+    # main_pages_pattern = r'/(about|faq|contact|home|pages)/'
 
     # Scrape the homepage content directly
     homepage_content = scrape_page_content(website_url)
@@ -490,18 +497,42 @@ def begin_scraping(website_name, website_url):
 
 class QueryModel(BaseModel):
     query: str
+    prompt : str
+    website : str
+
+class ScrapeModel(BaseModel):
+    website_url: str
+    website_name: str = Field(default="-")
+    exclude_pattern: str = Field(default=r'/(product|products|collection|collections|staging)/')
+    main_pages_pattern: str = Field(default=r'/(about|faq|contact|home|pages)/')
+
+    @validator('website_url')
+    def validate_url(cls, v):
+        if not v.startswith("http://") and not v.startswith("https://"):
+            raise ValueError('URL must start with http:// or https://')
+        if v.endswith('/'):
+            return v[:-1]
+        return v
 
 app = FastAPI()
 
-@app.post("/scrape")
-async def scrape_endpoint(url: str):
-    # Your scraping logic here
-    result = begin_scraping(url)
+@app.post("/scrape_website")
+async def scrape_endpoint(scrape_model: ScrapeModel):
+    result = begin_scraping(
+        website_url=scrape_model.website_url,
+        website_name=scrape_model.website_name,
+        exclude_pattern=scrape_model.exclude_pattern,
+        main_pages_pattern=scrape_model.main_pages_pattern
+    )
     return {"result": result}
+
 
 @app.post("/process_query")
 def process_query_endpoint(query_model: QueryModel):
 # Your query processing logic here
     query = query_model.query
-    response = questions(query)
+    prompt = query_model.prompt
+    website = query_model.website
+
+    response = questions(query,prompt,website)
     return {"response": response}
