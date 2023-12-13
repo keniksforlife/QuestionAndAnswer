@@ -16,20 +16,30 @@ from pydantic import BaseModel
 from tempfile import NamedTemporaryFile
 
 
+class QueryModel(BaseModel):
+    query: str
+
+app = FastAPI()
+
 # Load the spaCy model
 nlp = spacy.load('en_core_web_md')
 
 
 load_dotenv()
 open_ai_key = os.getenv("OPENAI_API_KEY")
-# Get the service account JSON from the environment variable
-bigquery_credentials_json = os.getenv('BIGQUERY_CREDENTIALS')
+bigquery_credentials = os.getenv('BIGQUERY_CREDENTIALS')
 
-# Parse the JSON string into a dictionary
-bigquery_credentials = json.loads(bigquery_credentials_json)
 
-# Create the BigQuery client using the parsed service account info
-client = bigquery.Client.from_service_account_info(bigquery_credentials)
+# Create a temporary file and write the credentials to it
+with NamedTemporaryFile(mode='w', delete=False) as cred_file:
+    cred_file.write(bigquery_credentials)
+    cred_file_path = cred_file.name
+
+# Now use this file to create the BigQuery client
+client = bigquery.Client.from_service_account_json(cred_file_path)
+
+# You can remove the temporary file after creating the client
+os.remove(cred_file_path)
 
 def save_to_json(data, filename):
     """Save the scraped data to a JSON file."""
@@ -488,15 +498,10 @@ def begin_scraping(website_name, website_url):
 # if __name__ == "__main__":
 #     questions()
 
-class QueryModel(BaseModel):
-    query: str
-
-app = FastAPI()
-
 @app.post("/scrape")
 async def scrape_endpoint(url: str):
     # Your scraping logic here
-    result = begin_scraping(url)
+    result = await begin_scraping(url)
     return {"result": result}
 
 @app.post("/process_query")
@@ -505,3 +510,21 @@ def process_query_endpoint(query_model: QueryModel):
     query = query_model.query
     response = questions(query)
     return {"response": response}
+
+# # Streamlit app starts here
+# st.title('Question & Answer AI')
+
+# query = st.text_input("Enter your query:")
+
+# if query:
+
+#     # try:
+#         st.write("Processing your query...")
+#         results = questions(query)
+#         if results:
+#             st.write(f"Answer : {results}")
+        
+#         else:
+#             st.write("No relevant content found.")
+#     # except Exception as e:
+#     #         st.error(f"An error occurred: {e}")
