@@ -352,7 +352,7 @@ def process_query_bigquery(query,website):
     query_sql = f"""
     SELECT url, content
     FROM `qanda-website-ai.websites.website_content`
-    WHERE {like_clauses} AND url LIKE '%{website}%' LIMIT 20
+    WHERE ({like_clauses}) AND url LIKE '%{website}%' LIMIT 20
     """
     print(query_sql)  # For debugging
     # client = bigquery.Client.from_service_account_json(json.loads(bigquery_credentials))
