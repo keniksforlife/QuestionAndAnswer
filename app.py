@@ -361,6 +361,8 @@ def process_query_bigquery(query,website):
     doc_query = nlp(query)
     relevant_content = []
 
+    print("q response:", query_job)
+
     for row in query_job:
         # Pre-filtering: Split content into sentences and check for key term presence
         if contains_discount_phrases(row.content):
@@ -370,7 +372,8 @@ def process_query_bigquery(query,website):
             if any(term in " ".join(sentences).lower() for term in key_terms):
                 doc_content = nlp(" ".join(sentences))
                 similarity = doc_query.similarity(doc_content)
-                if similarity > 0.55:  # Adjust the threshold as needed
+                print(similarity)
+                if similarity > 0.45:  # Adjust the threshold as needed
                     relevant_content.append((row.url, row.content, similarity))
 
     return relevant_content
